@@ -8185,7 +8185,6 @@ body, button, input, textarea, select {
   </script>
 
 <script>
-
     (function () {
       const GOOGLE_FORM_RESPONSE_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScUSJSDIHDb458moZnyRE1JKLQp3_Mj67j5l377j9rgU0rGdA/formResponse';
       const GOOGLE_EMAIL_FIELD = 'entry.399557935';
@@ -8207,6 +8206,7 @@ body, button, input, textarea, select {
         message.className = 'form-message';
         message.textContent = '';
 
+        emailInput.value = emailInput.value.trim();
         if (!emailInput.checkValidity()) {
           message.textContent = 'Please enter a valid email address.';
           emailInput.focus();
@@ -8219,6 +8219,7 @@ body, button, input, textarea, select {
         }
 
         const submitButton = form.querySelector('button[type="submit"]');
+        if (!submitButton) return;
         const originalButtonContent = submitButton.innerHTML;
         submissionInProgress = true;
         submitButton.disabled = true;
@@ -8226,13 +8227,12 @@ body, button, input, textarea, select {
         message.textContent = 'Submitting your signup…';
 
         emailInput.name = GOOGLE_EMAIL_FIELD;
-        emailInput.value = emailInput.value.trim();
         consentInput.name = GOOGLE_CONSENT_FIELD;
         consentInput.value = GOOGLE_CONSENT_VALUE;
-
         form.action = GOOGLE_FORM_RESPONSE_URL;
         form.method = 'POST';
         form.enctype = 'application/x-www-form-urlencoded';
+        const originalTarget = form.target;
 
         const iframeName = 'kryptikGoogleFormResponse_' + Date.now();
         const responseFrame = document.createElement('iframe');
@@ -8243,40 +8243,55 @@ body, button, input, textarea, select {
         responseFrame.style.cssText = 'position:absolute;width:1px;height:1px;border:0;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden;white-space:nowrap;';
         form.target = iframeName;
 
-        let initialBlankLoad = true;
+        let initialDocumentLoaded = false;
+        let completed = false;
         const restoreForm = function () {
           submissionInProgress = false;
+          form.target = originalTarget;
           submitButton.disabled = false;
           submitButton.innerHTML = originalButtonContent;
         };
+        const removeFrame = function () {
+          window.setTimeout(function () {
+            if (responseFrame.parentNode) responseFrame.parentNode.removeChild(responseFrame);
+          }, 1000);
+        };
 
         responseFrame.addEventListener('load', function () {
-          if (initialBlankLoad) {
-            initialBlankLoad = false;
-
-            HTMLFormElement.prototype.submit.call(form);
+          if (!initialDocumentLoaded) {
+            initialDocumentLoaded = true;
+            try {
+              HTMLFormElement.prototype.submit.call(form);
+            } catch (error) {
+              completed = true;
+              restoreForm();
+              message.className = 'form-message';
+              message.textContent = 'We could not submit your signup. Please try again.';
+              removeFrame();
+            }
             return;
           }
 
+          if (completed) return;
+          completed = true;
           message.className = 'form-message success';
-          message.textContent = 'Your signup has been submitted. Thank you for joining the waitlist.';
+          message.textContent = 'Your signup has been sent. Thank you for joining the waitlist.';
           form.reset();
           restoreForm();
-          window.setTimeout(function () {
-            if (responseFrame.parentNode) responseFrame.parentNode.removeChild(responseFrame);
-          }, 1500);
-        }, { once: false });
+          removeFrame();
+        });
 
+        responseFrame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><title></title></head><body></body></html>';
         document.body.appendChild(responseFrame);
-        responseFrame.src = 'about:blank';
 
         window.setTimeout(function () {
-          if (!submissionInProgress) return;
+          if (!submissionInProgress || completed) return;
+          completed = true;
           restoreForm();
           message.className = 'form-message';
           message.textContent = 'We could not confirm the submission. Please try again.';
-          if (responseFrame.parentNode) responseFrame.parentNode.removeChild(responseFrame);
-        }, 15000);
+          removeFrame();
+        }, 20000);
       });
     })();
   </script>
